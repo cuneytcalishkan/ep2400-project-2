@@ -57,7 +57,7 @@ public class Gradient extends SingleValueHolder implements CDProtocol {
         List<Peer> neighborsList = cg.getNeighbours();
 
         for (Peer n : neighborsList) {
-            if (!cache.contains(n)) {
+            if (!cache.contains(n) && (!n.getNode().equals(node))) {
                 cache.add(n);
             }
         }
@@ -87,16 +87,16 @@ public class Gradient extends SingleValueHolder implements CDProtocol {
             return 0;
         }
 
-        if (v1 > myValue && v2 > myValue) {//up-up
-            if (v1 > v2) {    //v2 is preferred
-                return -1;
-            } else {
+        if (v1 > myValue && v2 > myValue) {
+            if (v1 > v2) {
                 return 1;
+            } else {
+                return -1;
             }
         }
 
-        if (v1 < myValue && v2 < myValue) {//down-down
-            if (v1 > v2) {    //v2 is preferred
+        if (v1 < myValue && v2 < myValue) {
+            if (v1 > v2) {
                 return -1;
             } else {
                 return 1;
@@ -104,14 +104,9 @@ public class Gradient extends SingleValueHolder implements CDProtocol {
         }
 
         if (v1 > myValue && v2 < myValue) {
+            return -1;
+        } else {
             return 1;
         }
-
-        if (v1 < myValue && v2 > myValue) {
-            return -1;
-        }
-
-        return 1;
-
     }
 }
