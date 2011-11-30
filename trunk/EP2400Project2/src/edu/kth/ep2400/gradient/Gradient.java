@@ -35,23 +35,31 @@ public class Gradient extends SingleValueHolder implements CDProtocol {
 
     @Override
     public void nextCycle(Node node, int protocolID) {
-
+        UtilityComparator utilComp = new UtilityComparator(node, protocolID);
+        int time = CommonState.getIntTime();
         int linkableID = FastConfig.getLinkable(protocolID);
         Linkable linkable = (Linkable) node.getProtocol(linkableID);
 
         int degree = linkable.degree();
         int nbIndex = CommonState.r.nextInt(degree);
-        Node peer = linkable.getNeighbor(nbIndex);
-        if (!peer.isUp()) {
+        Node randomNode = linkable.getNeighbor(nbIndex);
+        if (!randomNode.isUp()) {
             return;
         }
 
         if (cache.isEmpty()) {
-            cache.add(new Peer(peer, 0));
+            cache.add(new Peer(randomNode, time));
         }
 
-        Collections.sort(cache, new UtilityComparator(node, protocolID));
+        Gradient cycGrad = (Gradient) randomNode.getProtocol(protocolID);
 
+        for (Peer n : cycGrad.getNeighbours()) {
+            if (!cache.contains(n) && (!n.getNode().equals(node))) {
+                cache.add(n);
+            }
+        }
+
+        Collections.sort(cache, utilComp);
         Peer closest = cache.get(0);
         Gradient cg = (Gradient) closest.getNode().getProtocol(protocolID);
         List<Peer> neighborsList = cg.getNeighbours();
@@ -62,7 +70,7 @@ public class Gradient extends SingleValueHolder implements CDProtocol {
             }
         }
 
-        Collections.sort(cache, new UtilityComparator(node, protocolID));
+        Collections.sort(cache, utilComp);
         for (int i = cache.size() - 1; i >= cacheSize; i--) {
             cache.remove(i);
         }
