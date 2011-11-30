@@ -31,6 +31,10 @@ public class GradientObserver implements Control {
             Gradient g = (Gradient) Network.get(i).getProtocol(pid);
             System.out.println("Time: " + time);
             System.out.println("My value:[" + g.getValue() + "]");
+            Peer leader = g.whoIsYourLeader(pid);
+            if (leader != null) {
+                System.out.println("My leader:[" + ((Gradient) g.whoIsYourLeader(pid).getNode().getProtocol(pid)).getValue() + "]");
+            }
             String nl = "[";
             for (Peer peer : g.getNeighbours()) {
                 Gradient ng = (Gradient) peer.getNode().getProtocol(pid);

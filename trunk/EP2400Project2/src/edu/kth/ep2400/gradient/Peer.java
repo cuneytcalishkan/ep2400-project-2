@@ -34,6 +34,11 @@ public class Peer {
 
     @Override
     public boolean equals(Object obj) {
+
+        if (obj == null) {
+            return false;
+        }
+
         if (!(obj instanceof Peer)) {
             return false;
         }
