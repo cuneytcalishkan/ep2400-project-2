@@ -103,7 +103,7 @@ public class Gradient extends SingleValueHolder implements CDProtocol {
             }
         }
 
-        if (v1 < myValue && v2 < myValue) {
+        if (v1 <= myValue && v2 <= myValue) {
             if (v1 > v2) {
                 return -1;
             } else {
@@ -111,7 +111,7 @@ public class Gradient extends SingleValueHolder implements CDProtocol {
             }
         }
 
-        if (v1 > myValue && v2 < myValue) {
+        if (v1 > myValue && v2 <= myValue) {
             return -1;
         } else {
             return 1;
