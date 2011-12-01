@@ -6,7 +6,6 @@ package edu.kth.ep2400.gradient;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import peersim.cdsim.CDProtocol;
 import peersim.config.Configuration;
@@ -101,6 +100,7 @@ public class Gradient2 extends SingleValueHolder implements CDProtocol {
         }
         if (electLeader(node, protocolID)) {
             electedLeader = new Peer(node, time);
+            electionGroup.clear();
             electionGroup.addAll(cache);
             ArrayList<Peer> rejected = new ArrayList<Peer>();
             for (Peer p : electionGroup) {
@@ -144,7 +144,7 @@ public class Gradient2 extends SingleValueHolder implements CDProtocol {
      */
     public boolean canIBeYourLeader(Node n, int pid) {
         double candidateutility = ((Gradient2) n.getProtocol(pid)).getValue();
-        if (electedLeader == null) {
+        if (electedLeader == null || !electedLeader.getNode().isUp()) {
             return true;
         } else if (((Gradient2) electedLeader.getNode().getProtocol(pid)).getValue() < candidateutility) {
             return true;
@@ -164,6 +164,10 @@ public class Gradient2 extends SingleValueHolder implements CDProtocol {
             }
         }
         cache.removeAll(nodesToRemove);
+        if (electedLeader != null && !electedLeader.getNode().isUp()) {
+            electedLeader = null;
+            leaderCounter = leaderSearchCycles;
+        }
     }
 
     /**
@@ -178,7 +182,6 @@ public class Gradient2 extends SingleValueHolder implements CDProtocol {
         for (Peer p : list) {
             utilitySum += ((Gradient2) p.getNode().getProtocol(pid)).getValue();
         }
-        Collections.sort(list, new UtilityAscendingComparator(pid));
         int luckyNumber = CommonState.r.nextInt((int) utilitySum);
         utilitySum = 0;
         for (Peer p : list) {
@@ -206,48 +209,70 @@ public class Gradient2 extends SingleValueHolder implements CDProtocol {
      * @return {@code true} if a leader election should be run, {@code false} otherwise
      */
     private boolean electLeader(Node node, int pid) {
-        //TODO should all nodes be able to start election? or only the ones in the election group?
-        //XXX How many peers should be in election group? and which ones?
+
         if (electedLeader != null) {
             if (electedLeader.getNode().isUp()) {
                 return false;
             } else {
-                return true;
+                if (!electionGroup.contains(new Peer(node, 0))) {
+                    return false;
+                }
+                int aliveCounter = 0;
+                for (Peer peer : electionGroup) {
+                    Gradient2 pg = (Gradient2) peer.getNode().getProtocol(pid);
+                    if (pg.isTheLeaderAlive()) {
+                        aliveCounter++;
+                    }
+                    //If the majority says that the leader is alive, cancel the procedure
+                    if (aliveCounter > electionGroup.size() / 2) {
+                        return false;
+                    }
+                }
+                return startElection(pid);
             }
         } else {
-//            if (!electionGroup.contains(new Peer(node, 0))) {
-//                return false;
-//            }
-            if (leaderCounter == leaderSearchCycles) {
-                leaderCounter = 0;
-                ArrayList<Peer> leaders = new ArrayList<Peer>();
-                for (Peer peer : cache) {
-                    Gradient2 pg = (Gradient2) peer.getNode().getProtocol(pid);
-                    Peer peersLeader = pg.whoIsYourLeader(pid);
-                    if (peersLeader != null) {
-                        double plv = ((Gradient2) peersLeader.getNode().getProtocol(pid)).getValue();
-                        //There is someone else who can be the leader
-                        if (plv > value) {
-                            return false;
-                        }
-                        leaders.add(peersLeader);
-                    }
+            return amITheNewLeader(pid);
+        }
+    }
+
+    public boolean isTheLeaderAlive() {
+        return electedLeader.getNode().isUp();
+    }
+
+    private boolean startElection(int pid) {
+        leaderCounter = 0;
+        ArrayList<Peer> leaders = new ArrayList<Peer>();
+        for (Peer peer : cache) {
+            Gradient2 pg = (Gradient2) peer.getNode().getProtocol(pid);
+            Peer peersLeader = pg.whoIsYourLeader(pid);
+            if (peersLeader != null) {
+                double plv = ((Gradient2) peersLeader.getNode().getProtocol(pid)).getValue();
+                //There is someone else who can be the leader
+                if (plv > value) {
+                    return false;
                 }
-                System.out.println("I am the leader :) " + getValue());
-                return true;
-            } else {
-                //Who is my leader?
-                Peer newLeader = whoIsYourLeader(pid);
-                if (newLeader != null) {
-                    if (!newLeader.equals(estimatedLeader)) {
-                        estimatedLeader = newLeader;
-                        leaderCounter = 0;
-                    } else {
-                        leaderCounter++;
-                    }
-                }
-                return false;
+                leaders.add(peersLeader);
             }
+        }
+        System.out.println("I am the leader :) " + getValue());
+        return true;
+    }
+
+    private boolean amITheNewLeader(int pid) {
+        if (leaderCounter == leaderSearchCycles) {
+            return startElection(pid);
+        } else {
+            //Who is my leader?
+            Peer newLeader = whoIsYourLeader(pid);
+            if (newLeader != null) {
+                if (!newLeader.equals(estimatedLeader)) {
+                    estimatedLeader = newLeader;
+                    leaderCounter = 0;
+                } else {
+                    leaderCounter++;
+                }
+            }
+            return false;
         }
     }
 
@@ -342,27 +367,5 @@ public class Gradient2 extends SingleValueHolder implements CDProtocol {
 
     public ArrayList<Peer> getRandomSet() {
         return randomSet;
-    }
-
-    class UtilityAscendingComparator implements Comparator<Peer> {
-
-        private final int pid;
-
-        public UtilityAscendingComparator(int pid) {
-            this.pid = pid;
-        }
-
-        @Override
-        public int compare(Peer o1, Peer o2) {
-            double v1 = ((Gradient2) o1.getNode().getProtocol(pid)).getValue();
-            double v2 = ((Gradient2) o2.getNode().getProtocol(pid)).getValue();
-            if (v1 > v2) {
-                return 1;
-            } else if (v2 > v1) {
-                return -1;
-            } else {
-                return 0;
-            }
-        }
     }
 }
