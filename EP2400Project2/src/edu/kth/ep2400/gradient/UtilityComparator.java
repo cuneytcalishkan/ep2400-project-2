@@ -24,6 +24,6 @@ public class UtilityComparator implements Comparator<Peer> {
     @Override
     public int compare(Peer o1, Peer o2) {
 
-        return Gradient.compare(o1, o2, node, protocolId);
+        return Gradient2.compare(o1, o2, node, protocolId);
     }
 }

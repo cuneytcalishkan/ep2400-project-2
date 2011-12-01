@@ -32,6 +32,10 @@ public class Peer {
         this.timeStamp = timeStamp;
     }
 
+    public void incrementTS() {
+        timeStamp++;
+    }
+
     @Override
     public boolean equals(Object obj) {
 

@@ -77,38 +77,46 @@ public class Gradient extends SingleValueHolder implements CDProtocol {
             cache.remove(i);
         }
 
-        leaderElection(protocolID);
+        electLeader(protocolID);
     }
 
-    private void leaderElection(int protocolId) {
-        if (leaderCounter == leaderAnnCycles) {
-            //TODO start leader election
-            leaderCounter = 0;
-            ArrayList<Peer> leaders = new ArrayList<Peer>();
-            for (Peer peer : cache) {
-                Node pn = peer.getNode();
-                Gradient pg = (Gradient) pn.getProtocol(protocolId);
-                Peer peersLeader = pg.whoIsYourLeader(protocolId);
-                if (peersLeader != null) {
-                    double plv = ((Gradient) peersLeader.getNode().getProtocol(protocolId)).getValue();
-                    //There is someone else who can be the leader
-                    if (plv > value) {
-                        return;
+    private boolean electLeader(int protocolId) {
+        //TODO should all nodes be able to start election? or only the ones in the election group?
+        if (electedLeader == null || !electedLeader.getNode().isUp()) {
+
+            if (leaderCounter == leaderAnnCycles) {
+                leaderCounter = 0;
+                ArrayList<Peer> leaders = new ArrayList<Peer>();
+                for (Peer peer : cache) {
+                    Node pn = peer.getNode();
+                    Gradient pg = (Gradient) pn.getProtocol(protocolId);
+                    Peer peersLeader = pg.whoIsYourLeader(protocolId);
+                    if (peersLeader != null) {
+                        double plv = ((Gradient) peersLeader.getNode().getProtocol(protocolId)).getValue();
+                        //There is someone else who can be the leader
+                        if (plv > value) {
+                            return false;
+                        }
+                        leaders.add(peersLeader);
                     }
-                    leaders.add(peersLeader);
                 }
+                System.out.println("I am the leader :) " + getValue());
+                return true;
+            } else {
+                //Who is my leader?
+                Peer newLeader = whoIsYourLeader(protocolId);
+                if (newLeader != null) {
+                    if (!newLeader.equals(estimatedLeader)) {
+                        estimatedLeader = newLeader;
+                        leaderCounter = 0;
+                    } else {
+                        leaderCounter++;
+                    }
+                }
+                return false;
             }
-            System.out.println("I am the leader :) " + getValue());
         } else {
-            //Who is my leader?
-            Peer newLeader = whoIsYourLeader(protocolId);
-            if (newLeader != null) {
-                if (!newLeader.equals(estimatedLeader)) {
-                    estimatedLeader = newLeader;
-                } else {
-                    leaderCounter++;
-                }
-            }
+            return false;
         }
     }
 
