@@ -84,6 +84,11 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
         }
     }
 
+    public void updateElectionGroup(List<Peer> newElectionGroup) {
+        electionGroup.clear();
+        electionGroup.addAll(newElectionGroup);
+    }
+
     public void youAreBlessed(ArrayList<Peer> electionGroup) {
         votesCollected++;
         if (votesCollected > electionGroup.size() / 2) {
