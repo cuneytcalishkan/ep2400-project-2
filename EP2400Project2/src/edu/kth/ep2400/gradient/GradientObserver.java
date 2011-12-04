@@ -7,7 +7,6 @@ package edu.kth.ep2400.gradient;
 import peersim.config.Configuration;
 import peersim.core.Control;
 import peersim.core.Network;
-import peersim.util.IncrementalStats;
 
 /**
  *
@@ -30,13 +29,19 @@ public class GradientObserver implements Control {
 
         for (int i = 0; i < Network.size(); i++) {
             Gradient2 g = (Gradient2) Network.get(i).getProtocol(pid);
-            System.out.println("Time: " + time);
-            System.out.println("My value:[" + g.getValue() + "]");
+            String nl = "[";
+            nl += "Time: " + time + ", ";
+            nl += "My value:{" + g.getValue() + "}, ";
             Peer bestNeighbor = g.whoIsYourBestNeighbor();
             if (bestNeighbor != null) {
-                System.out.println("My best neighbor:[" + ((Gradient2) g.whoIsYourBestNeighbor().getNode().getProtocol(pid)).getValue() + "]");
+                double best = ((Gradient2) bestNeighbor.getNode().getProtocol(pid)).getValue();
+                Peer l = g.whoIsTheLeader(0);
+                Gradient2 lg = (Gradient2) l.getNode().getProtocol(pid);
+                nl += "Leader:[" + lg.getValue() + ", " + l.getTimeStamp() + "], ";
+                nl += "Best neighbor:[" + best + "]";
+                nl += "Elected leader:[" + g.getElectedLeader() + "]\n";
             }
-            String nl = "[";
+
             for (Peer peer : g.getNeighbors()) {
                 Gradient2 ng = (Gradient2) peer.getNode().getProtocol(pid);
                 nl += ng.getValue() + ", ";
