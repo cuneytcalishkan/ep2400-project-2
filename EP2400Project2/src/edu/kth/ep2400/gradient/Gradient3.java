@@ -73,25 +73,38 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
         //Merge the similar sets
         cache = mergeNeighbors(node, cg.getNeighbors(), cache);
         removeDeadLinks();
+        checkLeader();
         //Sort according to preference function
         Collections.sort(cache, utilComp);
         //Remove the least significant Neighbors to fit to cache size
         for (int i = cache.size() - 1; i >= cacheSize; i--) {
+            if (electionGroup.contains(cache.get(i))) {
+                ((Gradient3) cache.get(i).getNode().getProtocol(protocolId)).youAreOutOfElectionGroup();
+            }
             cache.remove(i);
+        }
+        if (((new Peer(node, 0)).equals(electedLeader))) {
+            electionGroup.clear();
+            electionGroup.addAll(cache);
+            for (Peer p : cache) {
+                ((Gradient3) p.getNode().getProtocol(protocolId)).updateElectionGroup(electionGroup, electedLeader);
+            }
         }
         if (electLeader()) {
             twoPhaseCommit();
         }
     }
 
-    public void updateElectionGroup(List<Peer> newElectionGroup) {
+    public void updateElectionGroup(List<Peer> newElectionGroup, Peer electedLeader) {
         electionGroup.clear();
         electionGroup.addAll(newElectionGroup);
+        this.electedLeader = electedLeader;
     }
 
     public void youAreBlessed(ArrayList<Peer> electionGroup) {
         votesCollected++;
         if (votesCollected > electionGroup.size() / 2) {
+            votesCollected = 0;
             twoPhaseCommit();
         }
     }
@@ -143,6 +156,7 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
         if (electionGroup.isEmpty()) {
             electionGroup.addAll(cache);
         }
+        kickOldElectionGroup();
         //First phase of the procedure. Ask all the election members if I can be the leader
         for (Peer p : electionGroup) {
             Gradient3 pg = (Gradient3) p.getNode().getProtocol(protocolId);
@@ -155,7 +169,6 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
         if (iCanBeLeader) {
             Peer me = new Peer(node, CommonState.getIntTime());
             electedLeader = me;
-            kickOldElectionGroup();
             for (Peer p : electionGroup) {
                 ((Gradient3) p.getNode().getProtocol(protocolId)).adoptMeAsLeader(node, electionGroup);
             }
@@ -225,22 +238,22 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
             }
         }
         electionGroup.removeAll(deadLinks);
+    }
+
+    private void checkLeader() {
         if (electedLeader != null && !isTheLeaderAlive()) {
             electedLeader = null;
             if (consultToElectionGroup()) {
                 System.out.println(getValue() + " detected leader failure at " + CommonState.getIntTime());
-                //twoPhaseCommit();
                 double plv = 0;
-                Peer bestPotential = null;
+                Peer bestPotential = new Peer(node, CommonState.getIntTime());
                 for (Peer p : electionGroup) {
-                    if (!p.equals(new Peer(node, 0))) {
-                        Gradient3 pl = (Gradient3) p.getNode().getProtocol(protocolId);
-                        Peer pbp = pl.whoIsTheLeader(0);
-                        pl = (Gradient3) pbp.getNode().getProtocol(protocolId);
-                        if (plv < pl.getValue()) {
-                            plv = pl.getValue();
-                            bestPotential = pbp;
-                        }
+                    Gradient3 pl = (Gradient3) p.getNode().getProtocol(protocolId);
+                    Peer pbp = pl.whoIsTheLeader(0);
+                    pl = (Gradient3) pbp.getNode().getProtocol(protocolId);
+                    if (plv < pl.getValue()) {
+                        plv = pl.getValue();
+                        bestPotential = pbp;
                     }
                 }
                 ((Gradient3) bestPotential.getNode().getProtocol(protocolId)).youAreBlessed(electionGroup);
