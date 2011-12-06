@@ -39,7 +39,6 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
     private ArrayList<Peer> randomSet;
     private ArrayList<Peer> electionGroup;
     private TreeMap<Long, Message> messages;
-    private TreeMap<Long, Message> tempMsgHistory;
     private long msgId;
     private long localMessageCounter = 0;
     private ArrayList<String> queue;
@@ -116,11 +115,10 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
         }
     }
 
-    public void youAreBlessed(ArrayList<Peer> electionGroup, TreeMap<Long, Message> hist) {
+    public void youAreBlessed(ArrayList<Peer> electionGroup) {
         votesCollected++;
         if (votesCollected > electionGroup.size() / 2) {
             votesCollected = 0;
-            tempMsgHistory = hist;
             twoPhaseCommit();
         }
     }
@@ -192,14 +190,7 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
             for (Peer p : electionGroup) {
                 ((Gradient3) p.getNode().getProtocol(protocolId)).adoptMeAsLeader(node, electionGroup);
             }
-            if (tempMsgHistory != null) {
-                messages.clear();
-                messages.putAll(tempMsgHistory);
-                if (!messages.isEmpty()) {
-                    msgId = messages.firstKey();
-                }
-            }
-            System.out.println("I am the leader :) " + getValue());
+            System.out.println("I am the leader :) " + getValue() + " with " + messages.size() + " messages!");
         }
     }
 
@@ -208,11 +199,21 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
      */
     private void kickOldElectionGroup() {
         Peer me = new Peer(node, CommonState.getIntTime());
+        Gradient3 g = (Gradient3) electionGroup.get(0).getNode().getProtocol(protocolId);
+        TreeMap<Long, Message> msgh = g.getMessageHistory();
         for (Peer p : electionGroup) {
             //Kick the old election group members
             if (!p.equals(me)) {
-                ((Gradient3) p.getNode().getProtocol(protocolId)).youAreOutOfElectionGroup();
+                g = (Gradient3) p.getNode().getProtocol(protocolId);
+                if (g.getMessageHistory().size() > msgh.size()) {
+                    msgh = g.getMessageHistory();
+                }
+                g.youAreOutOfElectionGroup();
             }
+        }
+        messages = msgh;
+        if (!messages.isEmpty()) {
+            msgId = messages.firstKey();
         }
         electionGroup.clear();
         electionGroup.addAll(cache);
@@ -283,7 +284,7 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
                         bestPotential = pbp;
                     }
                 }
-                ((Gradient3) bestPotential.getNode().getProtocol(protocolId)).youAreBlessed(electionGroup, messages);
+                ((Gradient3) bestPotential.getNode().getProtocol(protocolId)).youAreBlessed(electionGroup);
                 System.out.println("Best potential leader value " + plv);
             }
         }
@@ -572,7 +573,7 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
         for (Peer p : electionGroup) {
             ((Gradient3) p.getNode().getProtocol(protocolId)).pushMessage(m);
         }
-        System.out.println(m + " published!");
+        System.out.println(m + " published by " + getValue());
     }
 
     public void pushMessage(Message msg) {
