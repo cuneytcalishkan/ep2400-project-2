@@ -582,10 +582,16 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
 
     public List<Message> pullMessage(long from, long to) {
         ArrayList<Message> result = new ArrayList<Message>();
-        long fk = messages.firstKey();
-        boolean finished = true;
+        long fk = 1;
+        if (!messages.isEmpty()) {
+            fk = messages.firstKey();
+        }
+        boolean finished = false;
+        Gradient3 bn = (Gradient3) whoIsYourBestNeighbor().getNode().getProtocol(protocolId);
         if (from > fk) {
-            result.addAll(((Gradient3) whoIsYourBestNeighbor().getNode().getProtocol(protocolId)).pullMessage(from, to));
+            if (!(bn.getValue() < getValue())) {
+                result.addAll(bn.pullMessage(from, to));
+            }
         } else {
             long f = from;
             long t = to;
@@ -600,11 +606,18 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
                     finished = false;
                 }
             }
-            for (long i = f; i <= t; i++) {
-                result.add(messages.get(i));
+            if (f != t) {
+                for (long i = f; i <= t; i++) {
+                    result.add(messages.get(i));
+                }
+            } else {
+                t--;
+            }
+            if ((new Peer(node, 0)).equals(electedLeader)) {
+                finished = true;
             }
             if (!finished) {
-                result.addAll(((Gradient3) whoIsYourBestNeighbor().getNode().getProtocol(protocolId)).pullMessage(t + 1, to));
+                result.addAll(bn.pullMessage(t + 1, to));
             }
         }
         return result;
