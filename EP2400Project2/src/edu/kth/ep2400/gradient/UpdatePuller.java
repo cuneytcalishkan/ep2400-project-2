@@ -20,6 +20,10 @@ public class UpdatePuller implements Control {
     private static final String PAR_PROTOCOL = "protocol";
     private final int pid;
 
+    /**
+     * This controller is run every cycle to pull messages from the leader.
+     * @param prefix
+     */
     public UpdatePuller(String prefix) {
         pid = Configuration.getPid(prefix + "." + PAR_PROTOCOL);
     }
@@ -27,7 +31,11 @@ public class UpdatePuller implements Control {
     @Override
     public boolean execute() {
 
-
+        /*
+         * Every cycle, a random peer from the network is selected to pull messages.
+         * The lower and upper bounds of the message ids are generated randomly from the maximum
+         * number of messages published so far.
+         */
         int rn = CommonState.r.nextInt(Network.size());
         Gradient3 g = (Gradient3) Network.get(rn).getProtocol(pid);
         Peer leader = g.whoIsTheLeader(1);
@@ -37,8 +45,13 @@ public class UpdatePuller implements Control {
         List<Message> messages = new ArrayList<Message>();
         messages = g.pullMessage(CommonState.r.nextInt(rn * CommonState.getIntTime()), CommonState.r.nextInt(rn * CommonState.getIntTime()));
         System.out.println(messages.size() + " messages pulled");
-        for (Message message : messages) {
-            System.out.println(message);
+        if (!messages.isEmpty()) {
+            //print out the first message
+            System.out.println(messages.get(0));
+            if (messages.size() > 1) //print out the last message
+            {
+                System.out.println(messages.get(messages.size() - 1));
+            }
         }
         return false;
     }
