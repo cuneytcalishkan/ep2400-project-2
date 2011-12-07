@@ -25,6 +25,12 @@ public class NodeKiller implements Control {
     private final int killStep;
     private final int endRound;
 
+    /**
+     * This controller is run to kill {@link #numOfNodesToKill} nodes every 
+     * {@link #killStep} rounds starting from {@link #startRound} and ending, not
+     * including, at {@link #endRound}.
+     * @param prefix The prefix of this protocol provided by Peersim
+     */
     public NodeKiller(String prefix) {
         numOfNodesToKill = Configuration.getInt(prefix + "." + PAR_NODES_TO_KILL);
         startRound = Configuration.getInt(prefix + "." + PAR_START_ROUND);

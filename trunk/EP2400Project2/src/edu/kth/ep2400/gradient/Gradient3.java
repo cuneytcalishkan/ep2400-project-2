@@ -43,6 +43,10 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
     private long localMessageCounter = 0;
     private ArrayList<String> queue;
 
+    /**
+     * Gradient overlay topology built according to preference function.
+     * @param prefix
+     */
     public Gradient3(String prefix) {
         super(prefix);
         this.prefix = prefix;
@@ -105,6 +109,13 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
         publishMessage();
     }
 
+    /**
+     * This method is used to maintain the election group members when the neighbors of the leader change.
+     * When the leader adds new neighbors, they are asked to be the members of the election group.
+     * @param newElectionGroup The new election group members.
+     * @param electedLeader The currently elected leader.
+     * @param msgs Message history
+     */
     public void updateElectionGroup(List<Peer> newElectionGroup, Peer electedLeader, TreeMap<Long, Message> msgs) {
         electionGroup.clear();
         electionGroup.addAll(newElectionGroup);
@@ -115,6 +126,11 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
         }
     }
 
+    /**
+     * This method is called by the election group members when they detect the leader's failure.
+     * They vote on their best potential leader through this method.
+     * @param electionGroup The election group
+     */
     public void youAreBlessed(ArrayList<Peer> electionGroup) {
         votesCollected++;
         if (votesCollected > electionGroup.size() / 2) {
@@ -123,15 +139,27 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
         }
     }
 
+    /**
+     * Returns the message history.
+     * @return The published messages stored in this node.
+     */
     public TreeMap<Long, Message> getMessageHistory() {
         return messages;
     }
 
+    /**
+     * This method is used to maintain the election group to kick the old members
+     * when new ones replace them.
+     */
     public void youAreOutOfElectionGroup() {
         electedLeader = null;
         electionGroup.clear();
     }
 
+    /**
+     * Retrieves a random neighbor P from the peer sampling service and selects
+     * a random peer P2 from P's random set and adds it to the random set of this node.
+     */
     private void manageRandomSet() {
         int time = CommonState.getIntTime();
         int linkableID = FastConfig.getLinkable(protocolId);
@@ -166,7 +194,7 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
 
     /**
      * Two phase commit procedure to elect the leader. First, this node asks all the
-     * members of the election group if it can be the leader. If they reply positively,
+     * members of the election group if it can be the leader. If they all reply positively,
      * then the second phase is run and they are made to adopt this node as their leader.
      */
     private void twoPhaseCommit() {
@@ -249,7 +277,7 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
     }
 
     /**
-     * Removes the links to dead neighbors and checks if the leader is alive or not.
+     * Removes the dead links in the similar set and election group.
      */
     private void removeDeadLinks() {
         ArrayList<Peer> deadLinks = new ArrayList<Peer>();
@@ -268,6 +296,12 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
         electionGroup.removeAll(deadLinks);
     }
 
+    /**
+     * Checks if the current elected leader is alive or not. If it is not alive,
+     * it will consult to the election group and will collect votes from them. If
+     * the majority agrees on the failure of the leader, this node will vote on 
+     * its potential leader.
+     */
     private void checkLeader() {
         if (electedLeader != null && !isTheLeaderAlive()) {
             electedLeader = null;
@@ -316,14 +350,14 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
     }
 
     /**
-     * The procedure is run if there is no elected leader currently or the elected leader has failed and this node is part of the election group.
-     * If there is no elected leader yet, each peer will wait until {@link #leaderSearchCycles} of cycles
-     * passes without adopting a new neighbor with a higher utility than the current highest utility neighbor.
-     * If {@link #leaderSearchCycles} of cycles are passed, the leaders of the neighbors are collected.
-     *      If there is a potential leader with a higher utility than this one's, this node exits the procedure.
-     *      If not, this node is the potential leader and will return {@code true} to indicate that a leader election should be run.
-     * Else, this node will check its own leader and will increment the {@link #leaderCounter} if the leader has not changed or
-     * will set the {@link #bestNeighbor} to its new potential leader and reset the {@link #leaderCounter} to 0.
+     * The procedure is run if there is no elected leader currently or the elected 
+     * leader has failed and this node is part of the election group.
+     * If there is no elected leader yet, each peer will try to find out if it can 
+     * be the leader by calling {@link #amITheNewLeader()} method.
+     * If the node is part of the election group, that means there is an elected leader,
+     * it will try to detect if the leader is alive or not. If the leader is alive, the method
+     * returns. If the leader is dead, it will consult to the election group. If they all agree,
+     * it will try to be the new leader.
      * @return {@code true} if a leader election should be run, {@code false} otherwise
      */
     private boolean electLeader() {
@@ -367,7 +401,7 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
 
     /**
      * Checks if the leader is alive or not.
-     * @return {@code true] if the leader is alive, {@code false} otherwise.
+     * @return {@code true] if there is an elected leader and it is alive, {@code false} otherwise.
      */
     public boolean isTheLeaderAlive() {
         if (electedLeader != null && electedLeader.getNode().isUp()) {
@@ -377,6 +411,12 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
         }
     }
 
+    /**
+     * When a node identifies that it is time to start election because {@link #amITheNewLeader()} method
+     * returned true, it will call this method to determine if he is the node with the highest utility
+     * among its neighbors' neighbors.
+     * @return {@code true} if this node can be the new leader.
+     */
     private boolean canStartElection() {
         for (Peer peer : cache) {
             Gradient3 pg = (Gradient3) peer.getNode().getProtocol(protocolId);
@@ -437,8 +477,8 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
     }
 
     /**
-     * Selects the potential leader which has the highest utility among the neighbors.
-     * @return The potential leader among the neighbors or null if there are no neighbors.
+     * Selects the highest utility among the neighbors.
+     * @return The highest utility node among the neighbors or null if there are no neighbors.
      */
     public Peer whoIsYourBestNeighbor() {
         if (!cache.isEmpty()) {
@@ -462,6 +502,11 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
         }
     }
 
+    /**
+     * This method determines who the elected leader is by passing messages over the gradient.
+     * @param step The number of steps traveled so far.
+     * @return The elected leader if there is any or null if there no elected leader.
+     */
     public Peer whoIsTheLeader(int step) {
         Peer leader = null;
         if (electedLeader == null) {
@@ -480,6 +525,12 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
         return leader;
     }
 
+    /**
+     * This method determines who is the potential leader in the gradient by relaying
+     * messages over the gradient towards the higher utility nodes.
+     * @return The highest utility node in the gradient reached by this query or null
+     * if none of the nodes have no neighbors.
+     */
     public Peer whoIsThePotentialLeader() {
         if (electedLeader == null) {
             if (cache.isEmpty()) {
@@ -511,10 +562,23 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
         return g;
     }
 
+    /**
+     * 
+     * @return
+     */
     public List<Peer> getNeighbors() {
         return cache;
     }
 
+    /**
+     * The preference function required to sort the neighbors to construct the gradient.
+     * @param o1 First peer to be compared.
+     * @param o2 Second peer to be compared.
+     * @param node This node
+     * @param protocolId Protocol id of {@link Gradient3} protocol.
+     * @return 1 if {@code o2} is preferred over {@code o1}, 0 if they are equal and -1 
+     * if {@code o1} is preferred over {@code o2}.
+     */
     public static int compare(Peer o1, Peer o2, Node node, int protocolId) {
         double myValue = ((Gradient3) node.getProtocol(protocolId)).getValue();
         double v1 = ((Gradient3) o1.getNode().getProtocol(protocolId)).getValue();
@@ -547,14 +611,27 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
         }
     }
 
+    /**
+     * 
+     * @return The random set provided by the peer sampling service.
+     */
     public ArrayList<Peer> getRandomSet() {
         return randomSet;
     }
 
+    /**
+     * 
+     * @return The current elected leader.
+     */
     public Peer getElectedLeader() {
         return electedLeader;
     }
 
+    /**
+     * Every cycle, each node publishes a message. If there is an elected leader,
+     * the leader is asked to broadcast it. If no elected leader yet, the messages are
+     * put into queue and published when the leader is elected.
+     */
     private void publishMessage() {
         Peer leader = whoIsTheLeader(1);
         String msg = "Message " + (++localMessageCounter) + " from " + getValue();
@@ -567,19 +644,37 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
         }
     }
 
+    /**
+     * This method is only revoked on the elected leader to broadcast a message that 
+     * is published by a node in the gradient. The message is also pushed down to the
+     * election group to keep replicas of the messages in case of a leader failure.
+     * @param msg The message to be broadcasted.
+     */
     public synchronized void broadcastMessage(String msg) {
         Message m = new Message(++msgId, msg);
         messages.put(m.getId(), m);
         for (Peer p : electionGroup) {
             ((Gradient3) p.getNode().getProtocol(protocolId)).pushMessage(m);
         }
-        System.out.println(m + " published by " + getValue());
+        //System.out.println(m + " published by " + getValue());
     }
 
+    /**
+     * 
+     * @param msg This method is invoked only on the election group members. It is
+     * used to keep replicas of the broadcasted messages.
+     */
     public void pushMessage(Message msg) {
         messages.put(msg.getId(), msg);
     }
 
+    /**
+     * Pull message starting from id {@code from} up to id {@code to}. If {@code to} is 
+     * set to -1, it means all messages up to now.
+     * @param from Lower bound of the messages to be pulled.
+     * @param to Upper bound of the messages to be pulled. -1 indicates all messages.
+     * @return List of messages accumulated over the gradient.
+     */
     public List<Message> pullMessage(long from, long to) {
         ArrayList<Message> result = new ArrayList<Message>();
         long fk = 1;

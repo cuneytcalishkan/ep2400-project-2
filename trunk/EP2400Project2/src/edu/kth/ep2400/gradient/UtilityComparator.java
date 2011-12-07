@@ -16,6 +16,12 @@ public class UtilityComparator implements Comparator<Peer> {
     private final Node node;
     private final int protocolId;
 
+    /**
+     * Constructs a comparator that compares the given 2 {@link Peer}s according
+     * to gradient's preference function.
+     * @param node The node that constructs this object.
+     * @param protocolId The protocol id of the node.
+     */
     public UtilityComparator(Node node, int protocolId) {
         this.node = node;
         this.protocolId = protocolId;

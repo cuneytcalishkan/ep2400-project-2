@@ -13,25 +13,30 @@ public class Message {
     private long id;
     private String msg;
 
+    /**
+     * Creates a new message to be published on the gradient overlay.
+     * @param id The id of the new message.
+     * @param msg The message content.
+     */
     public Message(long id, String msg) {
         this.id = id;
         this.msg = msg;
     }
 
+    /**
+     * 
+     * @return The message id.
+     */
     public long getId() {
         return id;
     }
 
-    public void setId(long id) {
-        this.id = id;
-    }
-
+    /**
+     * 
+     * @return The message content.
+     */
     public String getMsg() {
         return msg;
-    }
-
-    public void setMsg(String msg) {
-        this.msg = msg;
     }
 
     @Override
