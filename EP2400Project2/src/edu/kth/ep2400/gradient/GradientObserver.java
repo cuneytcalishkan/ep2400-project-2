@@ -36,7 +36,7 @@ public class GradientObserver implements Control {
             String nl = "[";
             nl += "Time: " + time + ", ";
             nl += "My value:{" + g.getValue() + "}, ";
-            Peer bestNeighbor = g.whoIsYourBestNeighbor();
+            Peer bestNeighbor = g.whoIsYourHighestNeighbor();
             if (bestNeighbor != null) {
                 double best = ((Gradient3) bestNeighbor.getNode().getProtocol(pid)).getValue();
                 Peer l = g.whoIsTheLeader(1);
@@ -44,8 +44,12 @@ public class GradientObserver implements Control {
                     Gradient3 lg = (Gradient3) l.getNode().getProtocol(pid);
                     nl += "Leader:[" + lg.getValue() + ", " + l.getTimeStamp() + "], ";
                 }
-                nl += "Best neighbor:[" + best + "]";
-                nl += "Elected leader:[" + g.getElectedLeader() + "]\n";
+                //nl += "Best neighbor:[" + best + "]";
+                if (g.getElectedLeader() != null) {
+                    nl += "Elected leader:[" + ((Gradient3) g.getElectedLeader().getNode().getProtocol(pid)).getValue() + "]";
+                } else {
+                    //nl += "Elected leader:[null]";
+                }
             }
 
 //            for (Peer peer : g.getNeighbors()) {
