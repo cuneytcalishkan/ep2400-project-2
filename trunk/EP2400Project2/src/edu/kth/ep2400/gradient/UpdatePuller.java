@@ -42,8 +42,10 @@ public class UpdatePuller implements Control {
         if (leader == null) {
             return false;
         }
+        long b1 = CommonState.r.nextLong(rn * CommonState.getIntTime());
+        long b2 = CommonState.r.nextLong(rn * CommonState.getIntTime());
         List<Message> messages = new ArrayList<Message>();
-        messages = g.pullMessage(CommonState.r.nextInt(rn * CommonState.getIntTime()), CommonState.r.nextInt(rn * CommonState.getIntTime()));
+        messages = g.pullMessage(Math.min(b1, b2), Math.max(b1, b2));
         System.out.println(messages.size() + " messages pulled");
         if (!messages.isEmpty()) {
             //print out the first message

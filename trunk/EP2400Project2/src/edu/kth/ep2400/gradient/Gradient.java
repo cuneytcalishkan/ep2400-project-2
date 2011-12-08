@@ -49,7 +49,7 @@ public class Gradient extends SingleValueHolder implements CDProtocol {
 
     @Override
     public void nextCycle(Node node, int protocolID) {
-        UtilityComparator utilComp = new UtilityComparator(node, protocolID);
+        PreferenceComparator utilComp = new PreferenceComparator(node, protocolID);
         int time = CommonState.getIntTime();
         int linkableID = FastConfig.getLinkable(protocolID);
         Linkable linkable = (Linkable) node.getProtocol(linkableID);

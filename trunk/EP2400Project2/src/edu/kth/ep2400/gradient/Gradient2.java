@@ -57,7 +57,7 @@ public class Gradient2 extends SingleValueHolder implements CDProtocol {
     public void nextCycle(Node node, int protocolID) {
         protocolId = protocolID;
         this.node = node;
-        UtilityComparator utilComp = new UtilityComparator(node, protocolId);
+        PreferenceComparator utilComp = new PreferenceComparator(node, protocolId);
 
         //Select a peer P from random set and add P2 to random set from P's random set
         manageRandomSet();
