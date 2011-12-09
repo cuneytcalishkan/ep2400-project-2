@@ -52,10 +52,10 @@ public class GradientObserver implements Control {
                 }
             }
 
-//            for (Peer peer : g.getNeighbors()) {
-//                Gradient3 ng = (Gradient3) peer.getNode().getProtocol(pid);
-//                nl += ng.getValue() + ", ";
-//            }
+            for (Peer peer : g.getNeighbors()) {
+                Gradient3 ng = (Gradient3) peer.getNode().getProtocol(pid);
+                nl += ng.getValue() + ", ";
+            }
             nl += "]";
             System.out.println(nl);
         }
