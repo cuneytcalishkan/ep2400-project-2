@@ -54,11 +54,11 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
         leaderSearchCycles = Configuration.getInt(prefix + "." + PAR_LEADER_ANN_CYCLES);
         protocolId = 0;
         node = null;
-        cache = new ArrayList<Peer>();
-        randomSet = new ArrayList<Peer>();
-        electionGroup = new ArrayList<Peer>();
+        cache = new ArrayList<>();
+        randomSet = new ArrayList<>();
+        electionGroup = new ArrayList<>();
         messages = new TreeMap(new MessageComparator());
-        queue = new ArrayList<String>();
+        queue = new ArrayList<>();
         msgId = 0;
         bestNeighbor = null;
         electedLeader = null;
@@ -330,7 +330,7 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
      * Removes the dead links in the similar set and election group.
      */
     private void removeDeadLinks() {
-        ArrayList<Peer> deadLinks = new ArrayList<Peer>();
+        ArrayList<Peer> deadLinks = new ArrayList<>();
         for (Peer peer : cache) {
             if (!peer.getNode().isUp()) {
                 deadLinks.add(peer);
@@ -519,7 +519,7 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
      * @return Merged list with the duplicates eliminated and entries pointing at {@code node} excluded.
      */
     private ArrayList<Peer> mergeNeighbors(List<Peer> list1, List<Peer> list2) {
-        ArrayList<Peer> result = new ArrayList<Peer>();
+        ArrayList<Peer> result = new ArrayList<>();
         result.addAll(list2);
         for (Peer n : list1) {
             if (!result.contains(n) && (!n.getNode().equals(node))) {
@@ -587,7 +587,7 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
         return leader;
 
     }
-   
+
     /**
      * This method determines who is the potential leader in the gradient by relaying
      * messages over the gradient towards the higher utility nodes.
@@ -739,7 +739,7 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
      * @return List of messages accumulated over the gradient.
      */
     public List<Message> pullMessage(long from, long to) {
-        ArrayList<Message> result = new ArrayList<Message>();
+        ArrayList<Message> result = new ArrayList<>();
         long fk = 1;
         if (!messages.isEmpty()) {
             fk = messages.firstKey();
