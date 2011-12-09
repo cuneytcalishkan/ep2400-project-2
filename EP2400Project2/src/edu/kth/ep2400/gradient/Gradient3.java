@@ -76,15 +76,15 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
         manageRandomSet();
 
         if (cache.isEmpty()) {
-            cache = mergeNeighbors(node, cache, randomSet);
+            cache = mergeNeighbors(randomSet, cache);
         }
         //Select probabilistically a random peer from both random set and cache biased towards higher utility
-        ArrayList<Peer> rs = mergeNeighbors(node, cache, randomSet);
+        ArrayList<Peer> rs = mergeNeighbors(randomSet, cache);
         Peer luckyPeer = selectProbabilisticNeighbor(rs);
         //Retrieve the similar set of the Neighbor
         Gradient3 cg = (Gradient3) luckyPeer.getNode().getProtocol(protocolId);
         //Merge the similar sets
-        cache = mergeNeighbors(node, cg.getNeighbors(), cache);
+        cache = mergeNeighbors(cg.getNeighbors(), cache);
         removeDeadLinks();
         checkLeader();
         //Sort according to preference function
@@ -302,7 +302,7 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
     /**
      * Can the calling node become my leader?
      * @param n Calling node
-     * @return {@code true} if I don't have any elected leader or the calling node has greater utility, {@code false} otherwise.
+     * @return The node that called this method or already elected leader or itself.
      */
     public Peer canIBeYourLeader(Node n) {
         double candidateutility = ((Gradient3) n.getProtocol(protocolId)).getValue();
@@ -518,7 +518,7 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
      * @param list2 Second list to be merged
      * @return Merged list with the duplicates eliminated and entries pointing at {@code node} excluded.
      */
-    private ArrayList<Peer> mergeNeighbors(Node node, List<Peer> list1, List<Peer> list2) {
+    private ArrayList<Peer> mergeNeighbors(List<Peer> list1, List<Peer> list2) {
         ArrayList<Peer> result = new ArrayList<>();
         result.addAll(list2);
         for (Peer n : list1) {
@@ -576,7 +576,7 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
         }
         return leader;
     }
-
+   
     /**
      * This method determines who is the potential leader in the gradient by relaying
      * messages over the gradient towards the higher utility nodes.
