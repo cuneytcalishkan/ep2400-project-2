@@ -54,11 +54,11 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
         leaderSearchCycles = Configuration.getInt(prefix + "." + PAR_LEADER_ANN_CYCLES);
         protocolId = 0;
         node = null;
-        cache = new ArrayList<>();
-        randomSet = new ArrayList<>();
-        electionGroup = new ArrayList<>();
+        cache = new ArrayList<Peer>();
+        randomSet = new ArrayList<Peer>();
+        electionGroup = new ArrayList<Peer>();
         messages = new TreeMap(new MessageComparator());
-        queue = new ArrayList<>();
+        queue = new ArrayList<String>();
         msgId = 0;
         bestNeighbor = null;
         electedLeader = null;
@@ -330,7 +330,7 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
      * Removes the dead links in the similar set and election group.
      */
     private void removeDeadLinks() {
-        ArrayList<Peer> deadLinks = new ArrayList<>();
+        ArrayList<Peer> deadLinks = new ArrayList<Peer>();
         for (Peer peer : cache) {
             if (!peer.getNode().isUp()) {
                 deadLinks.add(peer);
@@ -519,7 +519,7 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
      * @return Merged list with the duplicates eliminated and entries pointing at {@code node} excluded.
      */
     private ArrayList<Peer> mergeNeighbors(List<Peer> list1, List<Peer> list2) {
-        ArrayList<Peer> result = new ArrayList<>();
+        ArrayList<Peer> result = new ArrayList<Peer>();
         result.addAll(list2);
         for (Peer n : list1) {
             if (!result.contains(n) && (!n.getNode().equals(node))) {
@@ -571,10 +571,21 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
                 }
             }
         } else {
-            electedLeader.setTimeStamp(step);
-            leader = electedLeader;
+            if (((Gradient3) electedLeader.getNode().getProtocol(protocolId)).stillLeader()) {
+                electedLeader.setTimeStamp(step);
+                leader = electedLeader;
+            } else {
+                Peer best = whoIsYourHighestNeighbor();
+                if (best != null) {
+                    Gradient3 g = (Gradient3) best.getNode().getProtocol(protocolId);
+                    if (g.getValue() > getValue()) {
+                        leader = g.whoIsTheLeader(step + 1);
+                    }
+                }
+            }
         }
         return leader;
+
     }
    
     /**
@@ -728,7 +739,7 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
      * @return List of messages accumulated over the gradient.
      */
     public List<Message> pullMessage(long from, long to) {
-        ArrayList<Message> result = new ArrayList<>();
+        ArrayList<Message> result = new ArrayList<Message>();
         long fk = 1;
         if (!messages.isEmpty()) {
             fk = messages.firstKey();
@@ -776,6 +787,13 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
             }
         }
         return result;
+    }
+
+    public boolean stillLeader() {
+        if (electedLeader.equals(new Peer(node, 0))) {
+            return true;
+        }
+        return false;
     }
 
     class MessageComparator implements Comparator<Long> {
