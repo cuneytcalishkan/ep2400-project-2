@@ -54,11 +54,11 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
         leaderSearchCycles = Configuration.getInt(prefix + "." + PAR_LEADER_ANN_CYCLES);
         protocolId = 0;
         node = null;
-        cache = new ArrayList<Peer>();
-        randomSet = new ArrayList<Peer>();
-        electionGroup = new ArrayList<Peer>();
+        cache = new ArrayList<>();
+        randomSet = new ArrayList<>();
+        electionGroup = new ArrayList<>();
         messages = new TreeMap(new MessageComparator());
-        queue = new ArrayList<String>();
+        queue = new ArrayList<>();
         msgId = 0;
         bestNeighbor = null;
         electedLeader = null;
@@ -114,7 +114,20 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
         if (electLeader()) {
             twoPhaseCommit();
         }
-        publishMessage();
+//        publishMessage();
+//        if (whoIsTheLeader(1) != null) {
+//            List<Message> result = new ArrayList<>();
+//            if (messages.isEmpty()) {
+//                result = pullMessage(1, -1);
+//            } else {
+//                result = pullMessage(messages.firstKey() + 1, -1);
+//            }
+//            //System.out.println(result.size() + " messages pulled");
+//            for (Message message : result) {
+//                messages.put(message.getId(), message);
+//            }
+//        }
+
     }
 
     /**
@@ -195,6 +208,7 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
         if (degree == 0) {
             return;
         }
+        randomSet.clear();
         //Retrieve the random set from the peer sampling service
         for (int i = 0; i < degree; i++) {
             Node sampledPeer = linkable.getNeighbor(i);
@@ -224,7 +238,7 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
      * then the second phase is run and they are made to adopt this node as their leader.
      */
     private void twoPhaseCommit() {
-        boolean iCanBeLeader = true;
+        Peer potentialLeader = null;
         if (electionGroup.isEmpty()) {
             electionGroup.addAll(cache);
         }
@@ -232,13 +246,13 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
         //First phase of the procedure. Ask all the election members if I can be the leader
         for (Peer p : electionGroup) {
             Gradient3 pg = (Gradient3) p.getNode().getProtocol(protocolId);
-            iCanBeLeader = pg.canIBeYourLeader(node, protocolId);
-            if (!iCanBeLeader) {
+            potentialLeader = pg.canIBeYourLeader(node);
+            if (!(new Peer(node, CommonState.getIntTime())).equals(potentialLeader)) {
                 break;
             }
         }
         //Second phase. If all replied YES, make them adopt me as their leader.
-        if (iCanBeLeader) {
+        if ((new Peer(node, CommonState.getIntTime())).equals(potentialLeader)) {
             Peer me = new Peer(node, CommonState.getIntTime());
             electedLeader = me;
             for (Peer p : electionGroup) {
@@ -288,20 +302,27 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
     /**
      * Can the calling node become my leader?
      * @param n Calling node
-     * @param pid The protocol id
      * @return {@code true} if I don't have any elected leader or the calling node has greater utility, {@code false} otherwise.
      */
-    public boolean canIBeYourLeader(Node n, int pid) {
-        double candidateutility = ((Gradient3) n.getProtocol(pid)).getValue();
-        if (getValue() > candidateutility) {
-            return false;
-        }
-        if (!isTheLeaderAlive()) {
-            return true;
-        } else if (((Gradient3) electedLeader.getNode().getProtocol(pid)).getValue() < candidateutility) {
-            return true;
+    public Peer canIBeYourLeader(Node n) {
+        double candidateutility = ((Gradient3) n.getProtocol(protocolId)).getValue();
+        if (isTheLeaderAlive()) {
+            Gradient3 lg = (Gradient3) electedLeader.getNode().getProtocol(protocolId);
+            if (lg.getValue() > candidateutility) {
+                return electedLeader;
+            } else {
+                if (getValue() > candidateutility) {
+                    return new Peer(node, CommonState.getIntTime());
+                } else {
+                    return new Peer(n, CommonState.getIntTime());
+                }
+            }
         } else {
-            return false;
+            if (getValue() > candidateutility) {
+                return new Peer(node, CommonState.getIntTime());
+            } else {
+                return new Peer(n, CommonState.getIntTime());
+            }
         }
     }
 
@@ -309,7 +330,7 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
      * Removes the dead links in the similar set and election group.
      */
     private void removeDeadLinks() {
-        ArrayList<Peer> deadLinks = new ArrayList<Peer>();
+        ArrayList<Peer> deadLinks = new ArrayList<>();
         for (Peer peer : cache) {
             if (!peer.getNode().isUp()) {
                 deadLinks.add(peer);
@@ -498,7 +519,7 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
      * @return Merged list with the duplicates eliminated and entries pointing at {@code node} excluded.
      */
     private ArrayList<Peer> mergeNeighbors(Node node, List<Peer> list1, List<Peer> list2) {
-        ArrayList<Peer> result = new ArrayList<Peer>();
+        ArrayList<Peer> result = new ArrayList<>();
         result.addAll(list2);
         for (Peer n : list1) {
             if (!result.contains(n) && (!n.getNode().equals(node))) {
@@ -666,12 +687,10 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
      */
     private void publishMessage() {
         Peer leader = whoIsTheLeader(1);
-        String msg = "Message " + (++localMessageCounter) + " from " + getValue();
+        String msg = (++localMessageCounter) + " " + getValue();
         queue.add(msg);
         if (leader != null) {
-            for (int i = 0; i < queue.size(); i++) {
-                ((Gradient3) leader.getNode().getProtocol(protocolId)).broadcastMessage(queue.get(i));
-            }
+            ((Gradient3) leader.getNode().getProtocol(protocolId)).broadcastMessage(queue);
             queue.clear();
         }
     }
@@ -682,13 +701,14 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
      * election group to keep replicas of the messages in case of a leader failure.
      * @param msg The message to be broadcasted.
      */
-    public synchronized void broadcastMessage(String msg) {
-        Message m = new Message(++msgId, msg);
-        messages.put(m.getId(), m);
-        for (Peer p : electionGroup) {
-            ((Gradient3) p.getNode().getProtocol(protocolId)).pushMessage(m);
+    public synchronized void broadcastMessage(List<String> msgs) {
+        for (String mc : msgs) {
+            Message m = new Message(++msgId, mc);
+            messages.put(m.getId(), m);
+            for (Peer p : electionGroup) {
+                ((Gradient3) p.getNode().getProtocol(protocolId)).pushMessage(m);
+            }
         }
-        //System.out.println(m + " published by " + getValue());
     }
 
     /**
@@ -708,16 +728,22 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
      * @return List of messages accumulated over the gradient.
      */
     public List<Message> pullMessage(long from, long to) {
-        ArrayList<Message> result = new ArrayList<Message>();
+        ArrayList<Message> result = new ArrayList<>();
         long fk = 1;
         if (!messages.isEmpty()) {
             fk = messages.firstKey();
         }
         boolean finished = false;
-        Gradient3 bn = (Gradient3) whoIsYourHighestNeighbor().getNode().getProtocol(protocolId);
+        Peer best = whoIsYourHighestNeighbor();
+        Gradient3 bn = null;
+        if (best != null) {
+            bn = (Gradient3) best.getNode().getProtocol(protocolId);
+        }
         if (from > fk) {
-            if (!(bn.getValue() < getValue())) {
-                result.addAll(bn.pullMessage(from, to));
+            if (bn != null) {
+                if (!(bn.getValue() < getValue())) {
+                    result.addAll(bn.pullMessage(from, to));
+                }
             }
         } else {
             long f = from;
@@ -744,7 +770,9 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
                 finished = true;
             }
             if (!finished) {
-                result.addAll(bn.pullMessage(t + 1, to));
+                if (bn != null) {
+                    result.addAll(bn.pullMessage(t + 1, to));
+                }
             }
         }
         return result;
