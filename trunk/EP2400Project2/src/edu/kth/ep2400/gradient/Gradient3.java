@@ -42,6 +42,8 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
     private long localMessageCounter = 0;
     private ArrayList<String> queue;
     private PreferenceComparator prefComp;
+    private int failOverMessages = 0;
+    private int newLeaderMessages = 0;
 
     /**
      * Gradient overlay topology built according to preference function.
@@ -54,11 +56,11 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
         leaderSearchCycles = Configuration.getInt(prefix + "." + PAR_LEADER_ANN_CYCLES);
         protocolId = 0;
         node = null;
-        cache = new ArrayList<>();
-        randomSet = new ArrayList<>();
-        electionGroup = new ArrayList<>();
+        cache = new ArrayList<Peer>();
+        randomSet = new ArrayList<Peer>();
+        electionGroup = new ArrayList<Peer>();
         messages = new TreeMap(new MessageComparator());
-        queue = new ArrayList<>();
+        queue = new ArrayList<String>();
         msgId = 0;
         bestNeighbor = null;
         electedLeader = null;
@@ -122,10 +124,10 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
 //            } else {
 //                result = pullMessage(messages.firstKey() + 1, -1);
 //            }
-//            //System.out.println(result.size() + " messages pulled");
 //            for (Message message : result) {
 //                messages.put(message.getId(), message);
 //            }
+//            System.out.println(messages.size() + " messages in total by " + getValue());
 //        }
 
     }
@@ -174,6 +176,7 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
         votesCollected++;
         if (votesCollected > electionGroup.size() / 2) {
             votesCollected = 0;
+            failOverMessages++;
             twoPhaseCommit();
         }
     }
@@ -238,25 +241,27 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
      * then the second phase is run and they are made to adopt this node as their leader.
      */
     private void twoPhaseCommit() {
-        Peer potentialLeader = null;
         if (electionGroup.isEmpty()) {
             electionGroup.addAll(cache);
         }
         kickOldElectionGroup();
+        boolean iCanBeLeader = true;
         //First phase of the procedure. Ask all the election members if I can be the leader
         for (Peer p : electionGroup) {
             Gradient3 pg = (Gradient3) p.getNode().getProtocol(protocolId);
-            potentialLeader = pg.canIBeYourLeader(node);
-            if (!(new Peer(node, CommonState.getIntTime())).equals(potentialLeader)) {
+            iCanBeLeader = pg.canIBeYourLeader(node);
+            newLeaderMessages += 2;
+            if (!iCanBeLeader) {
                 break;
             }
         }
         //Second phase. If all replied YES, make them adopt me as their leader.
-        if ((new Peer(node, CommonState.getIntTime())).equals(potentialLeader)) {
+        if (iCanBeLeader) {
             Peer me = new Peer(node, CommonState.getIntTime());
             electedLeader = me;
             for (Peer p : electionGroup) {
                 ((Gradient3) p.getNode().getProtocol(protocolId)).adoptMeAsLeader(node, electionGroup);
+                newLeaderMessages++;
             }
             System.out.println("I am the leader :) " + getValue() + " with " + messages.size() + " messages!");
         }
@@ -302,26 +307,26 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
     /**
      * Can the calling node become my leader?
      * @param n Calling node
-     * @return The node that called this method or already elected leader or itself.
+     * @return {@code true} if the calling node can be my leader, {@code false} otherwise.
      */
-    public Peer canIBeYourLeader(Node n) {
+    public boolean canIBeYourLeader(Node n) {
         double candidateutility = ((Gradient3) n.getProtocol(protocolId)).getValue();
         if (isTheLeaderAlive()) {
             Gradient3 lg = (Gradient3) electedLeader.getNode().getProtocol(protocolId);
             if (lg.getValue() > candidateutility) {
-                return electedLeader;
+                return false;
             } else {
                 if (getValue() > candidateutility) {
-                    return new Peer(node, CommonState.getIntTime());
+                    return false;
                 } else {
-                    return new Peer(n, CommonState.getIntTime());
+                    return true;
                 }
             }
         } else {
             if (getValue() > candidateutility) {
-                return new Peer(node, CommonState.getIntTime());
+                return false;
             } else {
-                return new Peer(n, CommonState.getIntTime());
+                return true;
             }
         }
     }
@@ -330,7 +335,7 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
      * Removes the dead links in the similar set and election group.
      */
     private void removeDeadLinks() {
-        ArrayList<Peer> deadLinks = new ArrayList<>();
+        ArrayList<Peer> deadLinks = new ArrayList<Peer>();
         for (Peer peer : cache) {
             if (!peer.getNode().isUp()) {
                 deadLinks.add(peer);
@@ -354,8 +359,8 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
      */
     private void checkLeader() {
         if (electedLeader != null && !isTheLeaderAlive()) {
-            electedLeader = null;
             if (consultToElectionGroup()) {
+                electedLeader = null;
                 System.out.println(getValue() + " detected leader failure at " + CommonState.getIntTime());
                 double plv = 0;
                 Peer bestPotential = new Peer(node, CommonState.getIntTime());
@@ -440,6 +445,7 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
     private boolean consultToElectionGroup() {
         int aliveCounter = 0;
         for (Peer peer : electionGroup) {
+            failOverMessages += 2;
             Gradient3 pg = (Gradient3) peer.getNode().getProtocol(protocolId);
             if (pg.isTheLeaderAlive()) {
                 aliveCounter++;
@@ -519,7 +525,7 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
      * @return Merged list with the duplicates eliminated and entries pointing at {@code node} excluded.
      */
     private ArrayList<Peer> mergeNeighbors(List<Peer> list1, List<Peer> list2) {
-        ArrayList<Peer> result = new ArrayList<>();
+        ArrayList<Peer> result = new ArrayList<Peer>();
         result.addAll(list2);
         for (Peer n : list1) {
             if (!result.contains(n) && (!n.getNode().equals(node))) {
@@ -575,6 +581,8 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
                 electedLeader.setTimeStamp(step);
                 leader = electedLeader;
             } else {
+                electedLeader = null;
+                electionGroup.clear();
                 Peer best = whoIsYourHighestNeighbor();
                 if (best != null) {
                     Gradient3 g = (Gradient3) best.getNode().getProtocol(protocolId);
@@ -739,7 +747,7 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
      * @return List of messages accumulated over the gradient.
      */
     public List<Message> pullMessage(long from, long to) {
-        ArrayList<Message> result = new ArrayList<>();
+        ArrayList<Message> result = new ArrayList<Message>();
         long fk = 1;
         if (!messages.isEmpty()) {
             fk = messages.firstKey();
@@ -790,10 +798,19 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
     }
 
     public boolean stillLeader() {
-        if (electedLeader.equals(new Peer(node, 0))) {
+        Peer me = new Peer(node, 0);
+        if (electedLeader.equals(me)) {
             return true;
         }
         return false;
+    }
+
+    public int getFailOverMessages() {
+        return failOverMessages;
+    }
+
+    public int getNewLeaderMessages() {
+        return newLeaderMessages;
     }
 
     class MessageComparator implements Comparator<Long> {
