@@ -419,19 +419,15 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
      * @return {@code true} if a leader election should be run, {@code false} otherwise
      */
     private boolean electLeader() {
-        if (!electionGroup.isEmpty()) {
-            if (electedLeader != null) {
-                if (isTheLeaderAlive()) {
-                    return false;
-                } else {
-                    if (consultToElectionGroup()) {
-                        return canStartElection();
-                    } else {
-                        return false;
-                    }
-                }
+        if (whoIsTheLeader(0) != null) {
+            if (isTheLeaderAlive()) {
+                return false;
             } else {
-                return canStartElection();
+                if (consultToElectionGroup()) {
+                    return canStartElection();
+                } else {
+                    return false;
+                }
             }
         } else {
             return amITheNewLeader();
