@@ -36,11 +36,13 @@ public class GradientObserver implements Control {
         FileWriter ldFos = null;
         FileWriter foFos = null;
         FileWriter nlFos = null;
+        FileWriter msFos = null;
         String newLine = "\n";
         long time = peersim.core.CommonState.getTime();
         IncrementalStats isLeaderDiscovery = new IncrementalStats();
         IncrementalStats isFailOver = new IncrementalStats();
         IncrementalStats isNewLeader = new IncrementalStats();
+        IncrementalStats isMessagePullSteps = new IncrementalStats();
         for (int i = 0; i < Network.size(); i++) {
             Gradient3 g = (Gradient3) Network.get(i).getProtocol(pid);
             Peer leader = g.whoIsTheLeader(0);
@@ -50,46 +52,48 @@ public class GradientObserver implements Control {
                     isNewLeader.add(g.getNewLeaderMessages());
                 }
             }
-
+            isMessagePullSteps.add(g.getMessagePullSteps());
             isFailOver.add(g.getFailOverMessages());
 
-                        String nl = "[";
-                        nl += "Time: " + time + ", ";
-                        nl += "My value:{" + g.getValue() + "}, ";
+//                        String nl = "[";
+//                        nl += "Time: " + time + ", ";
+//                        nl += "My value:{" + g.getValue() + "}, ";
                         Peer bestNeighbor = g.whoIsYourHighestNeighbor();
                         if (bestNeighbor != null) {
                             double best = ((Gradient3) bestNeighbor.getNode().getProtocol(pid)).getValue();
-                            Peer l = g.whoIsTheLeader(1);
-                            if (l != null) {
-                                Gradient3 lg = (Gradient3) l.getNode().getProtocol(pid);
-                                nl += "Leader:[" + lg.getValue() + ", " + l.getTimeStamp() + "], ";
-                            }
+                            Peer l = g.whoIsTheLeader(0);
+//                            if (l != null) {
+//                                Gradient3 lg = (Gradient3) l.getNode().getProtocol(pid);
+//                                nl += "Leader:[" + lg.getValue() + ", " + l.getTimeStamp() + "], ";
+//                            }
                             //nl += "Best neighbor:[" + best + "]";
-                            if (g.getElectedLeader() != null) {
-                                nl += "Elected leader:[" + ((Gradient3) g.getElectedLeader().getNode().getProtocol(pid)).getValue() + "]";
-                            } else {
-                                //nl += "Elected leader:[null]";
-                            }
+//                            if (g.getElectedLeader() != null) {
+//                                nl += "Elected leader:[" + ((Gradient3) g.getElectedLeader().getNode().getProtocol(pid)).getValue() + "]";
+//                            } else {
+//                                //nl += "Elected leader:[null]";
+//                            }
                         }
             
-                        for (Peer peer : g.getNeighbors()) {
-                            Gradient3 ng = (Gradient3) peer.getNode().getProtocol(pid);
-                            nl += ng.getValue() + ", ";
-                        }
-                        nl += "]";
-                        System.out.println(nl);
+//                        for (Peer peer : g.getNeighbors()) {
+//                            Gradient3 ng = (Gradient3) peer.getNode().getProtocol(pid);
+//                            nl += ng.getValue() + ", ";
+//                        }
+//                        nl += "]";
+//                        System.out.println(nl);
         }
         try {
             File leaderDiscovery = new File("sim-results" + File.separator + "leaderDiscovery.tsv");
             File newLeader = new File("sim-results" + File.separator + "newLeader.tsv");
             File failOver = new File("sim-results" + File.separator + "failOver.tsv");
+            File messageSteps = new File("sim-results" + File.separator + "messageSteps.tsv");
             ldFos = new FileWriter(leaderDiscovery, true);
             ldFos.write(time + "\t" + isLeaderDiscovery.getAverage() + "\t" + isLeaderDiscovery.getMax() + newLine);
             foFos = new FileWriter(failOver, true);
             foFos.write(time + "\t" + isFailOver.getAverage() + "\t" + isFailOver.getMax() + newLine);
             nlFos = new FileWriter(newLeader, true);
             nlFos.write(time + "\t" + isNewLeader.getAverage() + "\t" + isNewLeader.getMax() + newLine);
-
+            msFos = new FileWriter(messageSteps, true);
+            msFos.write(time + "\t" + isMessagePullSteps.getSum() + newLine);
             return false;
         } catch (IOException ex) {
             ex.printStackTrace();
@@ -98,6 +102,7 @@ public class GradientObserver implements Control {
                 ldFos.close();
                 foFos.close();
                 nlFos.close();
+                msFos.close();
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
