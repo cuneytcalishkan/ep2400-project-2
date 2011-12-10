@@ -44,6 +44,7 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
     private PreferenceComparator prefComp;
     private int failOverMessages = 0;
     private int newLeaderMessages = 0;
+    private long messagePullSteps = 0;
 
     /**
      * Gradient overlay topology built according to preference function.
@@ -116,19 +117,22 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
         if (electLeader()) {
             twoPhaseCommit();
         }
-//        publishMessage();
-//        if (whoIsTheLeader(1) != null) {
-//            List<Message> result = new ArrayList<>();
-//            if (messages.isEmpty()) {
-//                result = pullMessage(1, -1);
-//            } else {
-//                result = pullMessage(messages.firstKey() + 1, -1);
-//            }
-//            for (Message message : result) {
-//                messages.put(message.getId(), message);
-//            }
+        publishMessage();
+        if (whoIsTheLeader(1) != null) {
+            List<Message> result = new ArrayList<Message>();
+            if (messages.isEmpty()) {
+                result = pullMessage(1, -1, 0);
+            } else {
+                result = pullMessage(messages.firstKey() + 1, -1, 0);
+            }
+            for (Message message : result) {
+                messages.put(message.getId(), message);
+            }
+            if (!result.isEmpty()) {
+                messagePullSteps = result.get(result.size() - 1).getId();
+            }
 //            System.out.println(messages.size() + " messages in total by " + getValue());
-//        }
+        }
 
     }
 
@@ -742,7 +746,7 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
      * @param to Upper bound of the messages to be pulled. -1 indicates all messages.
      * @return List of messages accumulated over the gradient.
      */
-    public List<Message> pullMessage(long from, long to) {
+    public List<Message> pullMessage(long from, long to, int steps) {
         ArrayList<Message> result = new ArrayList<Message>();
         long fk = 1;
         if (!messages.isEmpty()) {
@@ -757,7 +761,7 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
         if (from > fk) {
             if (bn != null) {
                 if (!(bn.getValue() < getValue())) {
-                    result.addAll(bn.pullMessage(from, to));
+                    result.addAll(bn.pullMessage(from, to, steps + 1));
                 }
             }
         } else {
@@ -786,8 +790,10 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
             }
             if (!finished) {
                 if (bn != null) {
-                    result.addAll(bn.pullMessage(t + 1, to));
+                    result.addAll(bn.pullMessage(t + 1, to, steps + 1));
                 }
+            } else {
+                result.add(new Message(steps, "number of steps"));
             }
         }
         return result;
@@ -807,6 +813,10 @@ public class Gradient3 extends SingleValueHolder implements CDProtocol {
 
     public int getNewLeaderMessages() {
         return newLeaderMessages;
+    }
+
+    public long getMessagePullSteps() {
+        return messagePullSteps;
     }
 
     class MessageComparator implements Comparator<Long> {
